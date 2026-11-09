@@ -30,37 +30,11 @@ jobs:
     outputs:
       sha: ${{ steps.source.outputs.sha }}
     steps:
-      - name: Diagnose stored credential access
-        if: inputs.validate_only
-        env:
-          SOURCE_TOKEN: ${{ secrets.GCAM_SOURCE_TOKEN }}
-          RELEASE_TOKEN: ${{ secrets.GCAM_RELEASE_TOKEN }}
-        run: |
-          probe() {
-            local name="$1" token="$2" endpoint="$3" status
-            if [[ -z "$token" ]]; then
-              printf '%s is empty\n' "$name"
-              return
-            fi
-            if [[ "$token" =~ [[:space:]] ]]; then
-              printf '%s contains whitespace\n' "$name"
-              return
-            fi
-            status="$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" "https://api.github.com/$endpoint")"
-            printf '%s %s: HTTP %s\n' "$name" "$endpoint" "$status"
-          }
-          if [[ -n "$SOURCE_TOKEN" && "$SOURCE_TOKEN" == "$RELEASE_TOKEN" ]]; then
-            echo 'Both secrets contain the same value.'
-          fi
-          probe GCAM_SOURCE_TOKEN "$SOURCE_TOKEN" user
-          probe GCAM_RELEASE_TOKEN "$RELEASE_TOKEN" user
-          probe GCAM_SOURCE_TOKEN "$SOURCE_TOKEN" "repos/Sienci-Labs/gCAM/git/ref/tags/$RELEASE_TAG"
-          probe GCAM_RELEASE_TOKEN "$RELEASE_TOKEN" "repos/Sienci-Labs/gCAM/git/ref/tags/$RELEASE_TAG"
       - name: Verify private tag and main ancestry
         id: source
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GCAM_SOURCE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GCAM_RELEASE_TOKEN }}
         run: |
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})$ ]] ||
@@ -99,7 +73,7 @@ jobs:
       - uses: ./.github/actions/private-source
         with:
           sha: ${{ needs.validate.outputs.sha }}
-          token: ${{ secrets.GCAM_SOURCE_TOKEN }}
+          token: ${{ secrets.GCAM_RELEASE_TOKEN }}
       - run: bash ../scripts/release.sh quality
 
   browser:
@@ -123,7 +97,7 @@ jobs:
       - uses: ./.github/actions/private-source
         with:
           sha: ${{ needs.validate.outputs.sha }}
-          token: ${{ secrets.GCAM_SOURCE_TOKEN }}
+          token: ${{ secrets.GCAM_RELEASE_TOKEN }}
       - run: bash ../scripts/release.sh browser
         env:
           TEST_SHARD: ${{ matrix.shard }}
@@ -151,7 +125,7 @@ jobs:
       - uses: ./.github/actions/private-source
         with:
           sha: ${{ needs.validate.outputs.sha }}
-          token: ${{ secrets.GCAM_SOURCE_TOKEN }}
+          token: ${{ secrets.GCAM_RELEASE_TOKEN }}
       - run: bash ../scripts/release.sh desktop ${{ matrix.target }}
       - name: Package installer
         run: bash ../scripts/release.sh package-desktop ${{ matrix.target }} ${{ matrix.arch }}
@@ -182,7 +156,7 @@ jobs:
       - uses: ./.github/actions/private-source
         with:
           sha: ${{ needs.validate.outputs.sha }}
-          token: ${{ secrets.GCAM_SOURCE_TOKEN }}
+          token: ${{ secrets.GCAM_RELEASE_TOKEN }}
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -229,7 +203,7 @@ jobs:
       - uses: ./.github/actions/private-source
         with:
           sha: ${{ needs.validate.outputs.sha }}
-          token: ${{ secrets.GCAM_SOURCE_TOKEN }}
+          token: ${{ secrets.GCAM_RELEASE_TOKEN }}
       - run: bash ../scripts/release.sh mobile ios
       - run: bash ../scripts/release.sh simulator
       - name: Attach files to the private draft
