@@ -18,9 +18,7 @@ environment these secrets:
 Use Sienci Labs as the token resource owner and get organization approval if
 required. A token with Contents write can also change the repository, so use
 short expirations and keep it scoped to gCAM. Supply the existing optional
-Windows and Mac signing secrets if those builds should be signed. The iPad
-build is a simulator archive. TestFlight submission stays in the private
-workflow.
+Windows signing secrets if needed. macOS releases require the Developer ID signing bundle and Apple notarization secrets. Android is the supported tablet target.
 
 ## Build a draft
 
