@@ -73,14 +73,26 @@ case "$1" in
         fi
         ;;
     package-desktop)
-        if [[ -z "$CSC_LINK" ]]; then
+        if [[ "$2" == mac ]]; then
+            : "${CSC_LINK:?Missing Developer ID signing bundle}"
+            : "${CSC_KEY_PASSWORD:?Missing signing bundle password}"
+            : "${APPLE_ID:?Missing Apple ID}"
+            : "${APPLE_APP_SPECIFIC_PASSWORD:?Missing Apple notarization password}"
+            : "${APPLE_TEAM_ID:?Missing Apple Developer team ID}"
+        elif [[ -z "$CSC_LINK" ]]; then
             unset CSC_LINK CSC_KEY_PASSWORD
             export CSC_IDENTITY_AUTO_DISCOVERY=false
         fi
         cd packaging/desktop
         quiet npm run package -- "--$2" "--$3"
         if [[ "$2" == mac ]]; then
-            quiet xcrun lipo dist/mac-arm64/gCAM.app/Contents/MacOS/gCAM -verify_arch arm64
+            app=dist/mac-arm64/gCAM.app
+            quiet xcrun lipo "$app/Contents/MacOS/gCAM" -verify_arch arm64
+            quiet codesign --verify --deep --strict "$app"
+            identity="$(codesign -dv --verbose=4 "$app" 2>&1)"
+            grep -q '^Authority=Developer ID Application:' <<< "$identity"
+            grep -Fxq "TeamIdentifier=$APPLE_TEAM_ID" <<< "$identity"
+            quiet xcrun stapler validate "$app"
         fi
         ;;
     mobile)
@@ -106,13 +118,6 @@ case "$1" in
             cp platforms/android/app/build/outputs/bundle/release/app-release.aab "dist/gCAM-${version#v}-android.aab"
         )
         ;;
-    simulator)
-        cd packaging/mobile
-        quiet npx cordova build ios --debug --emulator -- \
-            --buildFlag=CODE_SIGNING_ALLOWED=NO --buildFlag="ARCHS=arm64 x86_64"
-        quiet xcrun lipo platforms/ios/build/Debug-iphonesimulator/gCAM.app/gCAM -verify_arch arm64 x86_64
-        quiet ditto -c -k --sequesterRsrc --keepParent platforms/ios/build/Debug-iphonesimulator/gCAM.app gCAM-ipad-simulator.zip
-        ;;
     upload)
         shift
         private_draft
@@ -135,7 +140,7 @@ case "$1" in
         for required in "gCAM-$version-win-x64.exe" "gCAM-$version-linux-x86_64.AppImage" \
             "gCAM-$version-mac-arm64.dmg" "gCAM-$version-mac-arm64.zip" \
             "gCAM-$version-android.apk" "gCAM-$version-android.aab" \
-            gCAM-ipad-simulator.zip latest.yml latest-linux.yml latest-mac.yml; do
+            latest.yml latest-linux.yml latest-mac.yml; do
             [[ -s "$required" ]] || { echo 'A required private release asset is missing.' >&2; exit 1; }
         done
         find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -printf '%f\0' |
