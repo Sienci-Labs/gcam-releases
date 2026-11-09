@@ -1,0 +1,219 @@
+name: Build private gCAM release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing stable tag in the private gCAM repository
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-release-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.release_tag }}
+
+jobs:
+  validate:
+    if: github.repository == 'Sienci-Labs/gcam-releases' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: gcam-private-release
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - name: Verify private tag and main ancestry
+        id: source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GCAM_SOURCE_TOKEN }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})\.(0|[1-9][0-9]{0,2})$ ]] ||
+            { echo 'A stable version tag is required.' >&2; exit 1; }
+          repo=repos/Sienci-Labs/gCAM
+          gh api "$repo/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1 ||
+            { echo 'Private tag not found or checkout credential lacks access.' >&2; exit 1; }
+          sha="$(gh api "$repo/commits/$RELEASE_TAG" --jq .sha 2>/dev/null)"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          status="$(gh api "$repo/compare/$sha...main" --jq .status 2>/dev/null)"
+          [[ "$status" == ahead || "$status" == identical ]] ||
+            { echo 'The release commit must be on private main.' >&2; exit 1; }
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+      - name: Verify destination is a private draft
+        env:
+          GH_TOKEN: ${{ secrets.GCAM_RELEASE_TOKEN }}
+        run: |
+          test "$(gh repo view Sienci-Labs/gCAM --json visibility --jq .visibility 2>/dev/null)" = PRIVATE
+          test "$(gh release view "$RELEASE_TAG" -R Sienci-Labs/gCAM --json isDraft --jq .isDraft 2>/dev/null)" = true
+
+  quality:
+    needs: validate
+    environment: gcam-private-release
+    defaults:
+      run:
+        shell: bash
+        working-directory: source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/private-source
+        with:
+          sha: ${{ needs.validate.outputs.sha }}
+          token: ${{ secrets.GCAM_SOURCE_TOKEN }}
+      - run: bash ../scripts/release.sh quality
+
+  browser:
+    needs: validate
+    environment: gcam-private-release
+    defaults:
+      run:
+        shell: bash
+        working-directory: source
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/private-source
+        with:
+          sha: ${{ needs.validate.outputs.sha }}
+          token: ${{ secrets.GCAM_SOURCE_TOKEN }}
+      - run: bash ../scripts/release.sh browser
+        env:
+          TEST_SHARD: ${{ matrix.shard }}
+
+  desktop:
+    needs: [validate, quality, browser]
+    environment: gcam-private-release
+    defaults:
+      run:
+        shell: bash
+        working-directory: source
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, target: win, arch: x64 }
+          - { os: ubuntu-24.04, target: linux, arch: x64 }
+          - { os: macos-15-intel, target: mac, arch: arm64 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/private-source
+        with:
+          sha: ${{ needs.validate.outputs.sha }}
+          token: ${{ secrets.GCAM_SOURCE_TOKEN }}
+      - run: bash ../scripts/release.sh desktop ${{ matrix.target }}
+      - name: Package installer
+        run: bash ../scripts/release.sh package-desktop ${{ matrix.target }} ${{ matrix.arch }}
+        env:
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.MAC_CERTIFICATE_BASE64 || runner.os == 'Windows' && secrets.WINDOWS_CERTIFICATE_BASE64 || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.MAC_CERTIFICATE_PASSWORD || runner.os == 'Windows' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
+          APPLE_ID: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
+      - name: Attach files to the private draft
+        run: bash ../scripts/release.sh upload "packaging/desktop/dist/*.exe" "packaging/desktop/dist/*.dmg" "packaging/desktop/dist/*.zip" "packaging/desktop/dist/*.AppImage" "packaging/desktop/dist/*.deb" "packaging/desktop/dist/*.blockmap" "packaging/desktop/dist/latest*.yml"
+        env:
+          GH_TOKEN: ${{ secrets.GCAM_RELEASE_TOKEN }}
+
+  android:
+    needs: [validate, quality, browser]
+    environment: gcam-private-release
+    defaults:
+      run:
+        shell: bash
+        working-directory: source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/private-source
+        with:
+          sha: ${{ needs.validate.outputs.sha }}
+          token: ${{ secrets.GCAM_SOURCE_TOKEN }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.2'
+          cache-disabled: true
+          add-job-summary: never
+          dependency-graph: disabled
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: bash ../scripts/release.sh mobile android
+      - name: Sign Android installers
+        run: bash ../scripts/release.sh android
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - name: Attach files to the private draft
+        run: bash ../scripts/release.sh upload "packaging/mobile/dist/*.apk" "packaging/mobile/dist/*.aab"
+        env:
+          GH_TOKEN: ${{ secrets.GCAM_RELEASE_TOKEN }}
+
+  simulator:
+    needs: [validate, quality, browser]
+    environment: gcam-private-release
+    defaults:
+      run:
+        shell: bash
+        working-directory: source
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+      IOS_UPDATE_URL: ${{ vars.IOS_UPDATE_URL }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/private-source
+        with:
+          sha: ${{ needs.validate.outputs.sha }}
+          token: ${{ secrets.GCAM_SOURCE_TOKEN }}
+      - run: bash ../scripts/release.sh mobile ios
+      - run: bash ../scripts/release.sh simulator
+      - name: Attach files to the private draft
+        run: bash ../scripts/release.sh upload packaging/mobile/gCAM-ipad-simulator.zip
+        env:
+          GH_TOKEN: ${{ secrets.GCAM_RELEASE_TOKEN }}
+
+  verify:
+    needs: [desktop, android, simulator]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: gcam-private-release
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Verify private downloads and attach checksums
+        run: bash scripts/release.sh verify
+        env:
+          GH_TOKEN: ${{ secrets.GCAM_RELEASE_TOKEN }}

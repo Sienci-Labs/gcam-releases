@@ -1,0 +1,23 @@
+name: Check out private release source
+description: Fetch the verified private commit without persisting credentials or caching source files
+inputs:
+  sha:
+    description: Verified private release commit
+    required: true
+  token:
+    description: Read-only credential for the private source repository
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v6
+      with:
+        repository: Sienci-Labs/gCAM
+        ref: ${{ inputs.sha }}
+        token: ${{ inputs.token }}
+        path: source
+        persist-credentials: false
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 24
+        package-manager-cache: false
