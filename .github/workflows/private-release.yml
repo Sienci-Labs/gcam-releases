@@ -11,6 +11,10 @@ on:
         description: Check private access and draft without building or uploading
         type: boolean
         default: false
+      verify_only:
+        description: Verify and checksum existing private draft files
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -58,7 +62,7 @@ jobs:
 
   quality:
     needs: validate
-    if: ${{ !inputs.validate_only }}
+    if: ${{ !inputs.validate_only && !inputs.verify_only }}
     environment: gcam-private-release
     defaults:
       run:
@@ -78,7 +82,7 @@ jobs:
 
   browser:
     needs: validate
-    if: ${{ !inputs.validate_only }}
+    if: ${{ !inputs.validate_only && !inputs.verify_only }}
     environment: gcam-private-release
     defaults:
       run:
@@ -212,7 +216,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GCAM_RELEASE_TOKEN }}
 
   verify:
-    needs: [desktop, android, simulator]
+    needs: [validate, desktop, android, simulator]
+    if: ${{ !cancelled() && !inputs.validate_only && needs.validate.result == 'success' && (inputs.verify_only || (needs.desktop.result == 'success' && needs.android.result == 'success' && needs.simulator.result == 'success')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: gcam-private-release
