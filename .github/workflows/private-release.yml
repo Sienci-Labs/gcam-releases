@@ -7,6 +7,10 @@ on:
         description: Existing stable tag in the private gCAM repository
         required: true
         type: string
+      validate_only:
+        description: Check private access and draft without building or uploading
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -53,6 +57,7 @@ jobs:
 
   quality:
     needs: validate
+    if: ${{ !inputs.validate_only }}
     environment: gcam-private-release
     defaults:
       run:
@@ -72,6 +77,7 @@ jobs:
 
   browser:
     needs: validate
+    if: ${{ !inputs.validate_only }}
     environment: gcam-private-release
     defaults:
       run:
