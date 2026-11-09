@@ -188,36 +188,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GCAM_RELEASE_TOKEN }}
 
-  simulator:
-    needs: [validate, quality, browser]
-    environment: gcam-private-release
-    defaults:
-      run:
-        shell: bash
-        working-directory: source
-    runs-on: macos-15-intel
-    timeout-minutes: 30
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
-      IOS_UPDATE_URL: ${{ vars.IOS_UPDATE_URL }}
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/private-source
-        with:
-          sha: ${{ needs.validate.outputs.sha }}
-          token: ${{ secrets.GCAM_RELEASE_TOKEN }}
-      - run: bash ../scripts/release.sh mobile ios
-      - run: bash ../scripts/release.sh simulator
-      - name: Attach files to the private draft
-        run: bash ../scripts/release.sh upload packaging/mobile/gCAM-ipad-simulator.zip
-        env:
-          GH_TOKEN: ${{ secrets.GCAM_RELEASE_TOKEN }}
-
   verify:
-    needs: [validate, desktop, android, simulator]
-    if: ${{ !cancelled() && !inputs.validate_only && needs.validate.result == 'success' && (inputs.verify_only || (needs.desktop.result == 'success' && needs.android.result == 'success' && needs.simulator.result == 'success')) }}
+    needs: [validate, desktop, android]
+    if: ${{ !cancelled() && !inputs.validate_only && needs.validate.result == 'success' && (inputs.verify_only || (needs.desktop.result == 'success' && needs.android.result == 'success')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: gcam-private-release
