@@ -30,6 +30,32 @@ jobs:
     outputs:
       sha: ${{ steps.source.outputs.sha }}
     steps:
+      - name: Diagnose stored credential access
+        if: inputs.validate_only
+        env:
+          SOURCE_TOKEN: ${{ secrets.GCAM_SOURCE_TOKEN }}
+          RELEASE_TOKEN: ${{ secrets.GCAM_RELEASE_TOKEN }}
+        run: |
+          probe() {
+            local name="$1" token="$2" endpoint="$3" status
+            if [[ -z "$token" ]]; then
+              printf '%s is empty\n' "$name"
+              return
+            fi
+            if [[ "$token" =~ [[:space:]] ]]; then
+              printf '%s contains whitespace\n' "$name"
+              return
+            fi
+            status="$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" "https://api.github.com/$endpoint")"
+            printf '%s %s: HTTP %s\n' "$name" "$endpoint" "$status"
+          }
+          if [[ -n "$SOURCE_TOKEN" && "$SOURCE_TOKEN" == "$RELEASE_TOKEN" ]]; then
+            echo 'Both secrets contain the same value.'
+          fi
+          probe GCAM_SOURCE_TOKEN "$SOURCE_TOKEN" user
+          probe GCAM_RELEASE_TOKEN "$RELEASE_TOKEN" user
+          probe GCAM_SOURCE_TOKEN "$SOURCE_TOKEN" "repos/Sienci-Labs/gCAM/git/ref/tags/$RELEASE_TAG"
+          probe GCAM_RELEASE_TOKEN "$RELEASE_TOKEN" "repos/Sienci-Labs/gCAM/git/ref/tags/$RELEASE_TAG"
       - name: Verify private tag and main ancestry
         id: source
         shell: bash
