@@ -24,9 +24,9 @@ renderer() {
 }
 
 private_draft() {
-    export GH_REPO=Sienci-Labs/gCAM
-    if [[ "$(gh repo view --json visibility --jq .visibility 2>/dev/null)" != PRIVATE ||
-          "$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft 2>/dev/null)" != true ]]; then
+    release_repo=Sienci-Labs/gCAM
+    if [[ "$(gh repo view "$release_repo" --json visibility --jq .visibility 2>/dev/null)" != PRIVATE ||
+          "$(gh release view "$RELEASE_TAG" -R "$release_repo" --json isDraft --jq .isDraft 2>/dev/null)" != true ]]; then
         echo 'A draft in the private gCAM repository is required.' >&2
         return 1
     fi
@@ -124,13 +124,13 @@ case "$1" in
             done < <(compgen -G "$pattern" || true)
         done
         [[ ${#files[@]} -gt 0 ]] || { echo 'No matching private release files.' >&2; exit 1; }
-        quiet gh release upload "$RELEASE_TAG" "${files[@]}" --clobber
+        quiet gh release upload "$RELEASE_TAG" -R "$release_repo" "${files[@]}" --clobber
         ;;
     verify)
         private_draft
         dir="$(mktemp -d)"
         cd "$dir"
-        quiet gh release download "$RELEASE_TAG" --pattern '*' --dir .
+        quiet gh release download "$RELEASE_TAG" -R "$release_repo" --pattern '*' --dir .
         version="${RELEASE_TAG#v}"
         for required in "gCAM-$version-win-x64.exe" "gCAM-$version-linux-x86_64.AppImage" \
             "gCAM-$version-mac-arm64.dmg" "gCAM-$version-mac-arm64.zip" \
@@ -141,7 +141,7 @@ case "$1" in
         find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -printf '%f\0' |
             LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS.txt
         private_draft
-        quiet gh release upload "$RELEASE_TAG" SHA256SUMS.txt --clobber
+        quiet gh release upload "$RELEASE_TAG" -R "$release_repo" SHA256SUMS.txt --clobber
         ;;
     *)
         exit 2
