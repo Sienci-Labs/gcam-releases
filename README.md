@@ -12,8 +12,7 @@ environment these secrets:
 
 | Secret | Access |
 | --- | --- |
-| `GCAM_SOURCE_TOKEN` | Fine-grained token for `Sienci-Labs/gCAM` only, with **Contents: read**. |
-| `GCAM_RELEASE_TOKEN` | Separate fine-grained token for `Sienci-Labs/gCAM` only, with **Contents: read and write**. |
+| `GCAM_RELEASE_TOKEN` | Fine-grained token for `Sienci-Labs/gCAM` only, with **Contents: read and write** for checkout and release uploads. |
 | `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` | The existing Android release signing identity. |
 
 Use Sienci Labs as the token resource owner and get organization approval if
