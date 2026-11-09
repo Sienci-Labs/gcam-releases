@@ -81,6 +81,7 @@ jobs:
       - run: bash ../scripts/release.sh quality
 
   browser:
+    name: Cypress tests (${{ matrix.shard }})
     needs: validate
     if: ${{ !inputs.validate_only && !inputs.verify_only }}
     environment: gcam-private-release
