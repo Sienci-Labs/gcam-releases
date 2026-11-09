@@ -1,0 +1,40 @@
+name: Test macOS release signing
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  signing:
+    if: github.repository == 'Sienci-Labs/gcam-releases' && github.ref == 'refs/heads/main'
+    runs-on: macos-15-intel
+    environment: gcam-private-release
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/private-source
+        with:
+          sha: refs/tags/v0.2.12
+          token: ${{ secrets.GCAM_RELEASE_TOKEN }}
+      - name: Build gCAM for macOS
+        working-directory: source
+        run: bash ../scripts/release.sh desktop mac
+      - name: Sign, notarize and verify gCAM
+        working-directory: source
+        env:
+          CSC_LINK: ${{ secrets.MAC_CERTIFICATE_BASE64 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          : "${CSC_LINK:?}" "${CSC_KEY_PASSWORD:?}" "${APPLE_ID:?}" "${APPLE_APP_SPECIFIC_PASSWORD:?}" "${APPLE_TEAM_ID:?}"
+          bash ../scripts/release.sh package-desktop mac arm64
+          app=packaging/desktop/dist/mac-arm64/gCAM.app
+          codesign --verify --deep --strict "$app" >/dev/null 2>&1 || { echo 'Code signature verification failed.'; exit 1; }
+          identity="$(codesign -dv --verbose=4 "$app" 2>&1)"
+          grep -q '^Authority=Developer ID Application:' <<< "$identity"
+          grep -Fxq "TeamIdentifier=$APPLE_TEAM_ID" <<< "$identity"
+          xcrun stapler validate "$app" >/dev/null 2>&1 || { echo 'Stapled notarization ticket verification failed.'; exit 1; }
+          echo 'Developer ID signature and stapled Apple notarization ticket verified.'
