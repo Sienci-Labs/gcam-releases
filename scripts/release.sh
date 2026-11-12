@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
 quiet() {
     local log
     log="$(mktemp)"
@@ -18,7 +20,7 @@ browser_tests() {
     log="$(mktemp)"
     xvfb-run -a yarn test:e2e "$1" >"$log" 2>&1 || status=$?
     if (( status != 0 )); then
-        node ../scripts/cypress-summary.mjs "$log"
+        node "$script_dir/cypress-summary.mjs" "$log" || echo "Could not produce Cypress summary." >&2
         echo "Cypress shard ${TEST_SHARD} exited with code $status." >&2
     fi
     rm -f -- "$log"
