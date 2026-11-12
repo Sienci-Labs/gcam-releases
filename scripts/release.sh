@@ -13,6 +13,18 @@ quiet() {
     fi
 }
 
+browser_tests() {
+    local log status=0
+    log="$(mktemp)"
+    xvfb-run -a yarn test:e2e "$1" >"$log" 2>&1 || status=$?
+    if (( status != 0 )); then
+        node ../scripts/cypress-summary.mjs "$log"
+        echo "Cypress shard ${TEST_SHARD} exited with code $status." >&2
+    fi
+    rm -f -- "$log"
+    return "$status"
+}
+
 renderer() {
     quiet corepack enable
     export CYPRESS_INSTALL_BINARY=0
@@ -56,7 +68,7 @@ case "$1" in
             CYPRESS_INSTALL_BINARY=0 quiet yarn install --frozen-lockfile
             quiet yarn cypress install
             specs="$(node --input-type=module -e 'import { readdirSync } from "node:fs"; console.log(readdirSync("cypress/e2e",{recursive:true}).filter(n=>n.endsWith(".cy.js")).sort().filter((_,i)=>i%4===Number(process.env.TEST_SHARD)).map(n=>"cypress/e2e/"+n).join(","))')"
-            quiet xvfb-run -a yarn test:e2e "$specs"
+            browser_tests "$specs"
         )
         ;;
     desktop)
