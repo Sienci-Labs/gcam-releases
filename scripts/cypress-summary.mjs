@@ -9,6 +9,9 @@ let reported = 0;
 let category = '';
 let located = false;
 for (const line of lines) {
+    for (const code of ['STEP_READER_UNAVAILABLE', 'STEP_IMPORT_TIMEOUT', 'STEP_IMPORT_INVALID', 'STEP_IMPORT_STILL_READING']) {
+        if (line.includes(code)) console.log(`  STEP diagnostic: ${code}`);
+    }
     const running = line.match(/^\s*Running:\s+([a-zA-Z0-9_-]+\.cy\.js)\s/);
     if (running) currentSpec = running[1];
     if (/^\s*(?:AssertionError|CypressError|TypeError|Error):/.test(line) ||
