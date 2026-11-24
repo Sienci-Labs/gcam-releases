@@ -1,5 +1,18 @@
 # gcam-releases
 
+## gCAM checks
+
+Since 24 November 2026, this repository runs quality and browser tests for the
+latest commit on private gCAM's `main` branch. A scheduled check looks for a new
+commit every 15 minutes and queues tests if it finds one. Test results appear in
+this repository's Actions tab; they are not pull-request status checks. If several
+commits arrive between checks, only the latest is tested. Raw test output is
+discarded; failed browser checks report spec names and counts. Render deploys
+the web app separately from `main`.
+
+The installer workflow below is retained for reference and is not part of these
+checks.
+
 This repository contains the manual workflow for building gCAM. The source,
 release notes, installers and checksums stay in the private gCAM repository.
 
