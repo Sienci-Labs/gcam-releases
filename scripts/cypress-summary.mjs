@@ -9,6 +9,9 @@ let reported = 0;
 let category = '';
 let located = false;
 for (const line of lines) {
+    for (const code of ['VC_START', 'VC_CREATE', 'VC_INITIAL_SNAPSHOT', 'VC_EDIT', 'VC_EXPORT', 'VC_REIMPORT', 'VC_FINISHING', 'VC_UNPAIR', 'VC_TIMEOUT', 'VC_ERROR']) {
+        if (line.includes(code)) console.log(`  V-carve diagnostic: ${code}`);
+    }
     for (const code of ['STEP_INPUT_EXPECTED', 'STEP_INPUT_UNEXPECTED', 'STEP_INPUT_UNKNOWN', 'STEP_REASON_TIMEOUT', 'STEP_REASON_OTHER', 'STEP_PAGE_READING', 'STEP_PAGE_READER_ERROR', 'STEP_PAGE_OTHER', 'STEP_PAGE_SAME', 'STEP_PAGE_RELOADED']) {
         if (line.includes(code)) console.log(`  STEP diagnostic: ${code}`);
     }
