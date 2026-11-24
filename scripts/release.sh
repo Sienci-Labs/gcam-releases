@@ -70,7 +70,12 @@ case "$1" in
             export CYPRESS_CACHE_FOLDER="$RUNNER_TEMP/gcam-cypress"
             CYPRESS_INSTALL_BINARY=0 quiet yarn install --frozen-lockfile
             quiet yarn cypress install
-            specs="$(node --input-type=module -e 'import { readdirSync } from "node:fs"; console.log(readdirSync("cypress/e2e",{recursive:true}).filter(n=>n.endsWith(".cy.js")).sort().filter((_,i)=>i%4===Number(process.env.TEST_SHARD)).map(n=>"cypress/e2e/"+n).join(","))')"
+            if [[ -n "${TEST_SPEC:-}" ]]; then
+                [[ "$TEST_SPEC" =~ ^[a-zA-Z0-9_-]+\.cy\.js$ ]] || { echo 'Invalid test filename.' >&2; exit 1; }
+                specs="cypress/e2e/$TEST_SPEC"
+            else
+                specs="$(node --input-type=module -e 'import { readdirSync } from "node:fs"; console.log(readdirSync("cypress/e2e",{recursive:true}).filter(n=>n.endsWith(".cy.js")).sort().filter((_,i)=>i%4===Number(process.env.TEST_SHARD)).map(n=>"cypress/e2e/"+n).join(","))')"
+            fi
             browser_tests "$specs"
         )
         ;;
