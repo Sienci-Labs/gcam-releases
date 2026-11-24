@@ -11,15 +11,17 @@ let located = false;
 for (const line of lines) {
     const running = line.match(/^\s*Running:\s+([a-zA-Z0-9_-]+\.cy\.js)\s/);
     if (running) currentSpec = running[1];
-    if (/^\s*(?:AssertionError|CypressError|TypeError|Error):/.test(line)) {
+    if (/^\s*(?:AssertionError|CypressError|TypeError|Error):/.test(line) ||
+        /following error originated from your application code/i.test(line)) {
         category = /Timed out|Timed out retrying/i.test(line) ? 'timeout' :
             /not visible|hidden|covered|not actionable/i.test(line) ? 'not actionable' :
             /AssertionError/.test(line) ? 'assertion' : 'error';
         located = false;
     }
-    const location = line.match(/cypress\/e2e\/([a-zA-Z0-9_-]+\.cy\.js):(\d+):\d+/);
-    if (category && !located && location && location[1] === currentSpec) {
-        console.log(`  ${currentSpec}:${location[2]} — ${category}`);
+    const location = line.match(/cypress\/(e2e|support)\/([a-zA-Z0-9_.-]+\.js):(\d+):\d+/);
+    if (category && !located && location && (location[1] === 'support' || location[2] === currentSpec)) {
+        const file = location[1] === 'support' ? location[2] : currentSpec;
+        console.log(`  ${file}:${location[3]} — ${category}`);
         located = true;
     }
     const count = line.match(/^\s*\u2502\s*Failing:\s*(\d+)\s*\u2502\s*$/);
