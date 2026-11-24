@@ -9,7 +9,7 @@ let reported = 0;
 let category = '';
 let located = false;
 for (const line of lines) {
-    for (const code of ['STEP_READER_UNAVAILABLE', 'STEP_IMPORT_TIMEOUT', 'STEP_IMPORT_INVALID', 'STEP_IMPORT_STILL_READING']) {
+    for (const code of ['STEP_READER_UNAVAILABLE', 'STEP_IMPORT_TIMEOUT', 'STEP_IMPORT_INVALID', 'STEP_IMPORT_STILL_READING', 'STEP_IMPORT_OTHER_STATUS', 'STEP_IMPORT_OTHER_DIALOG', 'STEP_IMPORT_NO_STATUS']) {
         if (line.includes(code)) console.log(`  STEP diagnostic: ${code}`);
     }
     const running = line.match(/^\s*Running:\s+([a-zA-Z0-9_-]+\.cy\.js)\s/);
