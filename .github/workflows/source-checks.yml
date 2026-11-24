@@ -1,0 +1,100 @@
+name: Private source checks
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Private gCAM commit to test (leave blank to discover changes)
+        type: string
+        required: false
+
+run-name: ${{ inputs.revision && format('Checks {0}', inputs.revision) || 'Discover source changes' }}
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  discover:
+    if: ${{ !inputs.revision }}
+    runs-on: ubuntu-24.04
+    environment: gcam-private-release
+    steps:
+      - name: Queue checks for new main and pull request commits
+        env:
+          SOURCE_TOKEN: ${{ secrets.GCAM_RELEASE_TOKEN }}
+          PUBLIC_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidates="$(GH_TOKEN="$SOURCE_TOKEN" gh api repos/Sienci-Labs/gCAM/commits/main --jq .sha)"
+          prs="$(GH_TOKEN="$SOURCE_TOKEN" gh api --paginate 'repos/Sienci-Labs/gCAM/pulls?state=open&per_page=100' --jq '.[] | select(.head.repo.full_name == "Sienci-Labs/gCAM") | .head.sha')"
+          runs="$(GH_TOKEN="$PUBLIC_TOKEN" gh api --paginate 'repos/Sienci-Labs/gcam-releases/actions/workflows/source-checks.yml/runs?per_page=100' --jq '.workflow_runs[].display_title')"
+          while IFS= read -r sha; do
+            [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || continue
+            if ! grep -Fxq "Checks $sha" <<< "$runs"; then
+              GH_TOKEN="$PUBLIC_TOKEN" gh workflow run source-checks.yml -R "$GH_REPO" --ref main -f revision="$sha"
+              runs+=$'\n'"Checks $sha"
+            fi
+          done < <(printf '%s\n%s\n' "$candidates" "$prs" | sort -u)
+
+  validate:
+    if: ${{ inputs.revision }}
+    runs-on: ubuntu-24.04
+    environment: gcam-private-release
+    steps:
+      - name: Verify commit belongs to main or an open internal pull request
+        env:
+          GH_TOKEN: ${{ secrets.GCAM_RELEASE_TOKEN }}
+          REVISION: ${{ inputs.revision }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$REVISION" =~ ^[0-9a-f]{40}$ ]]
+          main="$(gh api repos/Sienci-Labs/gCAM/commits/main --jq .sha)"
+          prs="$(gh api --paginate 'repos/Sienci-Labs/gCAM/pulls?state=open&per_page=100' --jq '.[] | select(.head.repo.full_name == "Sienci-Labs/gCAM") | .head.sha')"
+          [[ "$REVISION" == "$main" ]] || grep -Fxq "$REVISION" <<< "$prs"
+
+  quality:
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: gcam-private-release
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/private-source
+        with:
+          sha: ${{ inputs.revision }}
+          token: ${{ secrets.GCAM_RELEASE_TOKEN }}
+      - name: Run quality checks
+        working-directory: source
+        run: bash ../scripts/release.sh quality
+
+  browser:
+    name: Browser tests (${{ matrix.shard }})
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    environment: gcam-private-release
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/private-source
+        with:
+          sha: ${{ inputs.revision }}
+          token: ${{ secrets.GCAM_RELEASE_TOKEN }}
+      - name: Run browser checks
+        working-directory: source
+        run: bash ../scripts/release.sh browser
+        env:
+          TEST_SHARD: ${{ matrix.shard }}
