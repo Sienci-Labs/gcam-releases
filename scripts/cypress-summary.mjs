@@ -9,6 +9,9 @@ let reported = 0;
 let category = '';
 let located = false;
 for (const line of lines) {
+    for (const code of ['STEP_INPUT_EXPECTED', 'STEP_INPUT_UNEXPECTED']) {
+        if (line.includes(code)) console.log(`  STEP diagnostic: ${code}`);
+    }
     for (const code of ['STEP_WASM_FETCHING', 'STEP_WASM_FETCHED', 'STEP_WASM_HTTP_ERROR', 'STEP_WASM_FETCH_ERROR', 'STEP_KERNEL_INITIALIZING', 'STEP_KERNEL_READY', 'STEP_MODEL_PARSED', 'STEP_WORKER_NOT_STARTED', 'STEP_WORKER_STARTED', 'STEP_WORKER_REPORTED_ERROR', 'STEP_WORKER_RETURNED_RESULT', 'STEP_WORKER_ERROR_EVENT', 'STEP_READER_UNAVAILABLE', 'STEP_IMPORT_TIMEOUT', 'STEP_IMPORT_INVALID', 'STEP_IMPORT_STILL_READING', 'STEP_IMPORT_NETWORK_ERROR', 'STEP_IMPORT_WASM_ERROR', 'STEP_IMPORT_GENERIC_ERROR', 'STEP_IMPORT_OTHER_STATUS', 'STEP_IMPORT_OTHER_DIALOG', 'STEP_IMPORT_NO_STATUS']) {
         if (line.includes(code)) console.log(`  STEP diagnostic: ${code}`);
     }
