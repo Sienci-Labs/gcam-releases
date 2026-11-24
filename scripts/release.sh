@@ -70,6 +70,15 @@ case "$1" in
             export CYPRESS_CACHE_FOLDER="$RUNNER_TEMP/gcam-cypress"
             CYPRESS_INSTALL_BINARY=0 quiet yarn install --frozen-lockfile
             quiet yarn cypress install
+            if [[ "${TEST_SPEC:-}" == engineering-model-cam.cy.js ]]; then
+                result_file="$(mktemp)"
+                if STEP_RESULT_FILE="$result_file" timeout 30s node "$script_dir/step-node-check.cjs" >/dev/null 2>&1; then
+                    if grep -Eq '^STEP_NODE_PASSED [0-9]+ms$' "$result_file"; then cat "$result_file"; fi
+                else
+                    echo 'STEP_NODE_FAILED_OR_TIMEOUT'
+                fi
+                rm -f -- "$result_file"
+            fi
             if [[ -n "${TEST_SPEC:-}" ]]; then
                 [[ "$TEST_SPEC" =~ ^[a-zA-Z0-9_-]+\.cy\.js$ ]] || { echo 'Invalid test filename.' >&2; exit 1; }
                 specs="cypress/e2e/$TEST_SPEC"
