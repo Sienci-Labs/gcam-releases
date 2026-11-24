@@ -13,6 +13,11 @@ on:
         description: Optional browser test filename for investigation
         type: string
         required: false
+      browser:
+        description: Browser for an individual test
+        type: choice
+        options: [electron, chrome]
+        default: electron
 
 run-name: ${{ inputs.spec && format('Investigate {0}', inputs.revision) || (inputs.revision && format('Checks {0}', inputs.revision) || 'Discover source changes') }}
 
@@ -102,3 +107,4 @@ jobs:
         env:
           TEST_SHARD: ${{ matrix.shard }}
           TEST_SPEC: ${{ inputs.spec }}
+          CYPRESS_BROWSER: ${{ inputs.browser || 'electron' }}
