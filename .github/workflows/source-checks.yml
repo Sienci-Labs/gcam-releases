@@ -31,7 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           candidates="$(GH_TOKEN="$SOURCE_TOKEN" gh api repos/Sienci-Labs/gCAM/commits/main --jq .sha)"
-          prs="$(GH_TOKEN="$SOURCE_TOKEN" gh api --paginate 'repos/Sienci-Labs/gCAM/pulls?state=open&per_page=100' --jq '.[] | select(.head.repo.full_name == "Sienci-Labs/gCAM") | .head.sha')"
+          prs="$(GH_TOKEN="$SOURCE_TOKEN" gh api --paginate 'repos/Sienci-Labs/gCAM/pulls?state=open&per_page=100' --jq '.[] | select(.head.repo.full_name == "Sienci-Labs/gCAM") | .head.sha' 2>/dev/null)" || echo '::warning::Private source token needs pull requests read access.'
           runs="$(GH_TOKEN="$PUBLIC_TOKEN" gh api --paginate 'repos/Sienci-Labs/gcam-releases/actions/workflows/source-checks.yml/runs?per_page=100' --jq '.workflow_runs[].display_title')"
           while IFS= read -r sha; do
             [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || continue
@@ -55,7 +55,7 @@ jobs:
           set -euo pipefail
           [[ "$REVISION" =~ ^[0-9a-f]{40}$ ]]
           main="$(gh api repos/Sienci-Labs/gCAM/commits/main --jq .sha)"
-          prs="$(gh api --paginate 'repos/Sienci-Labs/gCAM/pulls?state=open&per_page=100' --jq '.[] | select(.head.repo.full_name == "Sienci-Labs/gCAM") | .head.sha')"
+          prs="$(gh api --paginate 'repos/Sienci-Labs/gCAM/pulls?state=open&per_page=100' --jq '.[] | select(.head.repo.full_name == "Sienci-Labs/gCAM") | .head.sha' 2>/dev/null)" || prs=''
           [[ "$REVISION" == "$main" ]] || grep -Fxq "$REVISION" <<< "$prs"
 
   quality:
