@@ -19,7 +19,7 @@ quiet() {
 browser_tests() {
     local log status=0
     log="$(mktemp)"
-    xvfb-run -a yarn test:e2e "$1" >"$log" 2>&1 || status=$?
+    xvfb-run -a yarn test:e2e "$1" 2>&1 | tee "$log" | node "$script_dir/cypress-progress.mjs" || status=${PIPESTATUS[0]}
     if (( status != 0 )); then
         node "$script_dir/cypress-summary.mjs" "$log" || echo "Could not produce Cypress summary." >&2
         echo "Cypress shard ${TEST_SHARD} exited with code $status." >&2

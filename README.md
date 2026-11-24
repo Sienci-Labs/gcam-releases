@@ -7,7 +7,7 @@ latest commit on private gCAM's `main` branch. A scheduled check looks for a new
 commit every 15 minutes and queues tests if it finds one. Test results appear in
 this repository's Actions tab; they are not pull-request status checks. If several
 commits arrive between checks, only the latest is tested. Raw test output is
-discarded; failed browser checks report spec names, line numbers, fixed error
+discarded; browser checks report file progress, and failures report line numbers, fixed error
 categories and counts. Failed unit tests report file names and totals. Render
 deploys the web app separately from `main`.
 
