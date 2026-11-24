@@ -9,6 +9,7 @@ quiet() {
     if "$@" >"$log" 2>&1; then
         rm -f -- "$log"
     else
+        node "$script_dir/quality-summary.mjs" "$log" || true
         rm -f -- "$log"
         echo "Private release step failed: $1. Reproduce it in a private workspace." >&2
         return 1
